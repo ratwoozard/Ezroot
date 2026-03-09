@@ -1,0 +1,655 @@
+openapi: 3.0.3
+info:
+  title: Route Guide API
+  version: 1.0.0
+  description: B2B route planning API. Multi-tenant, JWT auth, RLS. Ingen kopiering af tredjepartsprodukter; original implementation.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3001
+    description: Local
+
+tags:
+  - name: auth
+    description: Registrering og login
+  - name: geocode
+    description: Adressesøgning (geokodning)
+  - name: vehicle-profiles
+    description: Køretøjsprofiler
+  - name: saved-places
+    description: Gemte steder
+  - name: routes
+    description: Ruteberegning og gemte ruter
+  - name: exports
+    description: Eksport (GPX, PDF)
+
+paths:
+  /auth/register:
+    post:
+      operationId: authRegister
+      tags: [auth]
+      summary: Opret organisation og admin-bruger
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Organisation og admin-bruger oprettet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Error'
+
+  /auth/login:
+    post:
+      operationId: authLogin
+      tags: [auth]
+      summary: Login – returnerer JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login OK; returnerer JWT og bruger
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Aktuel bruger
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: Aktuel bruger (fra JWT)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /geocode/search:
+    get:
+      operationId: geocodeSearch
+      tags: [geocode]
+      summary: Adressesøgning (fritekst → forslag med koordinater)
+      description: Ikke implementeret i MVP. Brug koordinat-input (fx "lat,lon") til POST /routes/compute. Fremtidig scope.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+          description: Søgetekst (adresse eller stednavn)
+      responses:
+        '200':
+          description: Liste af adresseforslag med lat/lon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeocodeResultList'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /vehicle-profiles:
+    get:
+      operationId: listVehicleProfiles
+      tags: [vehicle-profiles]
+      summary: List køretøjsprofiler (pagineret)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Pagineret liste af køretøjsprofiler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleProfileList'
+          headers:
+            X-Total-Count:
+              schema: { type: integer }
+              description: Samlet antal (convenience; canonical er body.totalCount)
+        '401':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createVehicleProfile
+      tags: [vehicle-profiles]
+      summary: Opret køretøjsprofil
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleProfileInput'
+      responses:
+        '201':
+          description: Køretøjsprofil oprettet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleProfile'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /vehicle-profiles/{id}:
+    get:
+      operationId: getVehicleProfile
+      tags: [vehicle-profiles]
+      summary: Hent køretøjsprofil
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Køretøjsprofil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleProfile'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateVehicleProfile
+      tags: [vehicle-profiles]
+      summary: Opdater køretøjsprofil
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VehicleProfileInput'
+      responses:
+        '200':
+          description: Køretøjsprofil opdateret
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleProfile'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteVehicleProfile
+      tags: [vehicle-profiles]
+      summary: Slet køretøjsprofil
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: Profil slettet
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /saved-places:
+    get:
+      operationId: listSavedPlaces
+      tags: [saved-places]
+      summary: List gemte steder (pagineret + søgning)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Pagineret liste af gemte steder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedPlaceList'
+          headers:
+            X-Total-Count:
+              schema: { type: integer }
+              description: Samlet antal (convenience; canonical er body.totalCount)
+        '401':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createSavedPlace
+      tags: [saved-places]
+      summary: Gem sted
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedPlaceInput'
+      responses:
+        '201':
+          description: Sted gemt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedPlace'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /saved-places/{id}:
+    delete:
+      operationId: deleteSavedPlace
+      tags: [saved-places]
+      summary: Slet gemt sted
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: Sted slettet
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /routes/compute:
+    post:
+      operationId: computeRoute
+      tags: [routes]
+      summary: Beregn rute (gemmes ikke)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RouteRequest'
+      responses:
+        '200':
+          description: Beregnet rute (geometry, distance_km, duration_min, warnings)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RouteResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+
+  /saved-routes:
+    get:
+      operationId: listSavedRoutes
+      tags: [routes]
+      summary: List gemte ruter (pagineret + søgning)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: Pagineret liste af gemte ruter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedRouteList'
+          headers:
+            X-Total-Count:
+              schema: { type: integer }
+              description: Samlet antal (convenience; canonical er body.totalCount)
+        '401':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createSavedRoute
+      tags: [routes]
+      summary: Gem beregnet rute
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedRouteInput'
+      responses:
+        '201':
+          description: Rute gemt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedRoute'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /saved-routes/{id}:
+    get:
+      operationId: getSavedRoute
+      tags: [routes]
+      summary: Hent gemt rute
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          description: Gemt rute med geometry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedRoute'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteSavedRoute
+      tags: [routes]
+      summary: Slet gemt rute
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '204':
+          description: Rute slettet
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /exports:
+    post:
+      operationId: createExport
+      tags: [exports]
+      summary: Opret eksport-job (GPX eller PDF)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '202':
+          description: Eksport-job oprettet; poll GET /exports/{jobId} for status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /exports/{jobId}:
+    get:
+      operationId: getExportJob
+      tags: [exports]
+      summary: Hent eksport-job status og fileUrl
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Eksport-job status og evt. file_url ved completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportJob'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Search:
+      name: search
+      in: query
+      schema: { type: string }
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Error:
+      description: Fejl (ErrorResponse envelope)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error_code, message]
+      properties:
+        error_code:
+          type: string
+          example: INVALID_INPUT
+        message:
+          type: string
+        details:
+          type: array
+          items: { type: string }
+
+    RegisterRequest:
+      type: object
+      required: [email, password, name, orgName]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        name: { type: string }
+        orgName: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+
+    GeocodeResult:
+      type: object
+      properties:
+        address: { type: string }
+        lat: { type: number }
+        lon: { type: number }
+    GeocodeResultList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/GeocodeResult' }
+
+    User:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        email: { type: string }
+        name: { type: string }
+        role: { type: string }
+
+    VehicleProfileInput:
+      type: object
+      required: [name, length, width, height, weight, axles]
+      properties:
+        name: { type: string }
+        length: { type: number }
+        width: { type: number }
+        height: { type: number }
+        weight: { type: number }
+        axles: { type: integer }
+        hazardous_material: { type: boolean, default: false }
+
+    VehicleProfile:
+      type: object
+      properties:
+        vehicle_id: { type: string, format: uuid }
+        org_id: { type: string, format: uuid }
+        name: { type: string }
+        length: { type: number }
+        width: { type: number }
+        height: { type: number }
+        weight: { type: number }
+        axles: { type: integer }
+        hazardous_material: { type: boolean }
+
+    VehicleProfileList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/VehicleProfile' }
+        totalCount: { type: integer }
+
+    SavedPlaceInput:
+      type: object
+      required: [name, lat, lon]
+      properties:
+        name: { type: string }
+        address: { type: string }
+        lat: { type: number }
+        lon: { type: number }
+
+    SavedPlace:
+      type: object
+      properties:
+        place_id: { type: string, format: uuid }
+        name: { type: string }
+        address: { type: string }
+        lat: { type: number }
+        lon: { type: number }
+
+    SavedPlaceList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SavedPlace' }
+        totalCount: { type: integer }
+
+    RouteRequest:
+      type: object
+      required: [origin, destination]
+      properties:
+        origin:
+          type: string
+          description: Adresse eller "lat,lon"
+        destination:
+          type: string
+        waypoints:
+          type: array
+          items: { type: string }
+        vehicleId: { type: string, format: uuid }
+
+    RouteResult:
+      type: object
+      description: Beregnet rute fra GraphHopper eller dev fallback (warnings angiver fallback).
+      properties:
+        geometry:
+          type: array
+          description: LineString som [lon, lat][]
+          items:
+            type: array
+            items: { type: number }
+        distance_km: { type: number }
+        duration_min: { type: number }
+        warnings:
+          type: array
+          items: { type: string }
+
+    SavedRouteInput:
+      type: object
+      required: [name, vehicleId]
+      properties:
+        name: { type: string }
+        vehicleId: { type: string, format: uuid }
+        origin: { type: string }
+        destination: { type: string }
+        waypoints: { type: array, items: { type: string } }
+        geometry: { type: array, items: { type: array, items: { type: number } } }
+        distance_km: { type: number }
+        duration_min: { type: number }
+
+    SavedRoute:
+      type: object
+      properties:
+        route_id: { type: string, format: uuid }
+        name: { type: string }
+        vehicle_id: { type: string, format: uuid }
+        distance_km: { type: number }
+        duration_min: { type: number }
+        geometry: { type: array, items: { type: array, items: { type: number } } }
+
+    SavedRouteList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SavedRoute' }
+        totalCount: { type: integer }
+
+    ExportRequest:
+      type: object
+      required: [routeId, format]
+      properties:
+        routeId: { type: string, format: uuid }
+        format: { type: string, enum: [GPX, PDF] }
+
+    ExportJob:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+        status: { type: string, enum: [pending, completed, failed] }
+        file_url: { type: string, nullable: true }
+        message: { type: string, nullable: true }

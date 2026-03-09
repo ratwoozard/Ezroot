@@ -1,0 +1,27 @@
+# Docs freeze gates: OpenAPI lint + traceability check.
+# Must pass before merge to default branch.
+name: Docs CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  docs-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: OpenAPI lint
+        run: npx --yes @redocly/cli lint docs/04-api/openapi.yaml --config .redocly.yaml
+
+      - name: Traceability check
+        run: node scripts/traceability-check.mjs

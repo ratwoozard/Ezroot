@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment (secrets – use .env.example as template)
+.env
+.env.local
+.env.*.local
+
+# Build / cache
+dist/
+.turbo/
+.next/
+out/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

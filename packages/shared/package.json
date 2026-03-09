@@ -1,0 +1,15 @@
+{
+  "name": "@ezroot/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared types and constants (OpenAPI-aligned)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\""
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,19 @@
+# Redocly CLI config – Route Guide API
+# https://redocly.com/docs/cli/configuration/
+
+extends:
+  - recommended
+
+rules:
+  # Allow localhost for local dev spec
+  no-server-example.com:
+    severity: off
+  # Require operationId (we have them)
+  operation-operationId:
+    severity: error
+  # Require description on responses (we have them)
+  struct:
+    severity: error
+  # All operations must have security declared (we use security: [] for public)
+  security-defined:
+    severity: error

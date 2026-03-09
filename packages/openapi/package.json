@@ -1,0 +1,21 @@
+{
+  "name": "@ezroot/openapi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Route Guide API OpenAPI spec",
+  "main": "openapi.yaml",
+  "types": "generated/schema.d.ts",
+  "files": ["openapi.yaml", "generated"],
+  "exports": {
+    ".": "./openapi.yaml",
+    "./generated/schema": "./generated/schema.d.ts"
+  },
+  "scripts": {
+    "lint": "npx @redocly/cli lint openapi.yaml",
+    "codegen": "openapi-typescript openapi.yaml -o generated/schema.d.ts"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^1.25.0",
+    "openapi-typescript": "^7.4.0"
+  }
+}

@@ -1,0 +1,59 @@
+# EzRoot infra – Postgres, Redis, GraphHopper, Martin
+# Kør: docker compose -f infra/docker-compose.yml up -d
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-appdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  graphhopper:
+    image: ghcr.io/graphhopper/graphhopper:8.0
+    ports:
+      - "8989:8989"
+    environment:
+      JAVA_OPTS: "-Xmx2g -Xms1g"
+    volumes:
+      - graphhopper_data:/data
+    # Ved første start: ingen graf; kør import med scripts/import-graphhopper.sh
+    # Efter import: genstart med web -d /data (image default)
+    profiles:
+      - full
+    # For lokal dev uden import: kan køre tom og API returnerer 503 for routes (light mode)
+
+  martin:
+    image: ghcr.io/maplibre/martin:0.14
+    ports:
+      - "6767:3000"
+    environment:
+      MARTIN_DATABASE_URL: postgres://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-secret}@postgres:5432/${POSTGRES_DB:-appdb}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Martin forventer PostGIS med tile-tabeller; efter osm2pgsql import virker tiles
+    # Uden osm2pgsql: Martin starter men returnerer ingen tiles (frontend kan bruge fallback style)
+
+volumes:
+  postgres_data:
+  graphhopper_data:

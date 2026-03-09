@@ -1,0 +1,29 @@
+{
+  "name": "ezroot",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Route Guide B2B – map + route planning",
+  "scripts": {
+    "api:dev": "npx pnpm -C apps/api start:dev",
+    "web:dev": "npx pnpm -C apps/web dev",
+    "seed": "npx pnpm -C apps/api run seed:run",
+    "migration:run": "node scripts/run-migrations.js",
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "clean": "turbo run clean --force",
+    "docs:lint": "npx @redocly/cli lint docs/04-api/openapi.yaml --config .redocly.yaml",
+    "docs:trace": "node scripts/traceability-check.mjs",
+    "docs:check": "npm run docs:lint && npm run docs:trace",
+    "docs:bundle": "npx @redocly/cli bundle docs/04-api/openapi.yaml -o docs/04-api/openapi.bundle.yaml"
+  },
+  "devDependencies": {
+    "pg": "^8.11.3",
+    "turbo": "^2.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "packageManager": "pnpm@9.14.2"
+}
